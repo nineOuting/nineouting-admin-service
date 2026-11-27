@@ -54,6 +54,12 @@ public class DatabaseController {
         return schema.table(registry.require(db).jdbc(), table);
     }
 
+    /** REQ-219 짧은 글자 열에 이미 들어 있는 값 (열 이름 → 값 목록) */
+    @GetMapping("/{db}/tables/{table}/suggestions")
+    public Map<String, List<String>> suggestions(@PathVariable String db, @PathVariable String table) {
+        return rows.suggestions(registry.require(db), table);
+    }
+
     @GetMapping("/{db}/tables/{table}/rows")
     public RowService.Page rows(@PathVariable String db, @PathVariable String table,
                                 @RequestParam(defaultValue = "0") int page,

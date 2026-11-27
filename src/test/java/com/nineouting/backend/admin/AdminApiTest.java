@@ -66,6 +66,17 @@ class AdminApiTest {
                     create table logs (message text);
                     create table flyway_schema_history (installed_rank int primary key, version varchar(50));
                     create table "weird""name" (id int primary key);
+                    create table kinds (id int primary key, kind varchar(20), token varchar(20), memo text,
+                      many varchar(20), request_id varchar(20));
+                    insert into kinds select i, case when i % 2 = 0 then 'MAIL' else 'PUSH' end, 't' || i, 'm',
+                      'v' || i, 'r' from generate_series(1, 30) i;
+                    create type mood as enum ('HAPPY', 'SAD');
+                    create table statuses (
+                      id int primary key,
+                      status varchar(20) not null check (status in ('OPEN', 'CLOSED', 'it''s')),
+                      feeling mood,
+                      score int check (score > 0)
+                    );
                     insert into items (name, data, tags, password_hash) values
                       ('alpha', '{"k":1}', '{x,y}', 'hash-1'), ('beta', null, null, null), ('gamma', null, null, null);
                     insert into pairs values (1, 'x', 'first');
@@ -117,6 +128,30 @@ class AdminApiTest {
                 .andExpect(jsonPath("$.primaryKey", contains("id")))
                 .andExpect(jsonPath("$.readOnly").value(false))
                 .andExpect(jsonPath("$.columns[?(@.name == 'data')].type").value("jsonb"));
+    }
+
+    @Test
+    void 허용_값이_정해진_열은_값_목록을_준다() throws Exception {
+        // REQ-219 CHECK (... in (...)) 제약과 enum 형식. 다른 모양의 CHECK는 목록이 없다
+        Cookie cookie = loggedIn();
+        mockMvc.perform(get("/api/admin/databases/test/tables/statuses").cookie(cookie))
+                .andExpect(jsonPath("$.columns[1].allowedValues", contains("OPEN", "CLOSED", "it's")))
+                .andExpect(jsonPath("$.columns[2].allowedValues", contains("HAPPY", "SAD")))
+                .andExpect(jsonPath("$.columns[3].allowedValues").isEmpty())
+                .andExpect(jsonPath("$.columns[0].allowedValues").isEmpty());
+    }
+
+    @Test
+    void 짧은_글자_열은_이미_들어_있는_값을_추천하고_비밀값_열은_뺀다() throws Exception {
+        // REQ-219 서비스 DB의 상태 열은 CHECK 제약이 없어 들어 있는 값으로 추천한다
+        Cookie cookie = loggedIn();
+        mockMvc.perform(get("/api/admin/databases/test/tables/kinds/suggestions").cookie(cookie))
+                .andExpect(jsonPath("$.kind", contains("MAIL", "PUSH")))
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.memo").doesNotExist())
+                .andExpect(jsonPath("$.many").doesNotExist())
+                .andExpect(jsonPath("$.request_id").doesNotExist())
+                .andExpect(jsonPath("$.id").doesNotExist());
     }
 
     @Test

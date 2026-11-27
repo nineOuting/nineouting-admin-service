@@ -64,7 +64,9 @@ nineouting:
       url: ${DB_ADMIN_URL:}
       username: ${DB_ADMIN_USERNAME:}
       password: ${DB_ADMIN_PASSWORD:}
-    # 운영 조치를 맡길 서비스 (REQ-217). 표를 직접 고치지 않고 각 서비스의 내부 기능을 부른다
+    # 운영 조치(REQ-217), 빠른 작업(REQ-218)을 맡길 서비스. 표를 직접 고치지 않고 각 서비스의 내부 기능을 부른다
     services:
       meeting-url: ${MEETING_SERVICE_URL:}
       minutes-url: ${MINUTES_SERVICE_URL:}
+      user-url: ${USER_SERVICE_URL:}
+      workspace-url: ${WORKSPACE_SERVICE_URL:}

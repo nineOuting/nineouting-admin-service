@@ -4,7 +4,9 @@
 
 ## 하는 일
 - 관리자 로그인: 계정 하나. 5번 틀리면 15분 잠금. 로그인하면 HttpOnly 쿠키(8시간)
-- 표 목록, 열 정보(형식, 기본 키), 행 조회(쪽 나누기, 정렬, 검색)
+- 표 목록, 열 정보(형식, 기본 키, 허용 값 목록), 행 조회(쪽 나누기, 정렬, 검색)
+  - 허용 값 목록: enum 형식이나 `CHECK (열 in (...))` 제약이 걸린 열의 값. 화면이 고르기 목록으로 보여 준다 (REQ-219)
+- 빠른 작업 (REQ-218): 시험 계정 만들기(이메일 인증 없이), 사용자를 워크스페이스 멤버로 넣기. 표를 직접 고치지 않고 user-service, workspace-service의 내부 기능(`/internal/admin/...`)을 불러 비밀번호 해시, 중복 확인이 평소처럼 된다
 - 한 행 추가, 수정, 삭제. 수정과 삭제는 기본 키로 정확히 한 행만 바꾼다
 - 읽기만 하는 표: 배포 이력 표(`flyway_schema_history`), 기본 키가 없는 표
 - 모든 추가, 수정, 삭제는 `admin.audit` 로그에 남긴다 (비밀번호, 토큰 열은 값을 가림)
@@ -24,6 +26,7 @@
 | `ADMIN_SESSION_SECRET` | 로그인 쿠키 서명 키 (32자 이상) |
 | `ADMIN_ALLOWED_ORIGINS` | 관리자 화면 주소 (CORS). 기본 `https://dev.nepnep.app` |
 | `ADMIN_COOKIE_SECURE` | HTTPS에서만 쿠키 (로컬 http면 `false`) |
+| `USER_SERVICE_URL`, `WORKSPACE_SERVICE_URL` | 빠른 작업을 맡길 서비스 주소 (클러스터 안). 비어 있으면 그 작업은 쓸 수 없다 |
 | `DB_<이름>_URL`, `DB_<이름>_USERNAME`, `DB_<이름>_PASSWORD` | 이름은 USER, WORKSPACE, MEETING, MINUTES, NOTIFICATION. 주소가 빈 DB는 목록에서 빠진다 |
 
 DEV에서는 비밀값(쿠버네티스 Secret)으로 넣고, DB 비밀번호는 각 서비스의 기존 Secret을 그대로 쓴다.

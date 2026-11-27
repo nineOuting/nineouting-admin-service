@@ -57,7 +57,7 @@ public record AdminProperties(
         // 감사 기록 DB가 비어 있으면 로그로만 남긴다 (로컬, 시험)
         auditDatabase = auditDatabase == null || auditDatabase.url() == null || auditDatabase.url().isBlank()
                 ? null : auditDatabase;
-        services = services == null ? new Services(null, null) : services;
+        services = services == null ? new Services(null, null, null, null) : services;
     }
 
     private static void require(String value, String name) {
@@ -75,8 +75,8 @@ public record AdminProperties(
         }
     }
 
-    /** 운영 조치를 맡길 서비스 주소 (클러스터 안). 비어 있으면 그 조치는 쓸 수 없다 */
-    public record Services(String meetingUrl, String minutesUrl) {
+    /** 운영 조치(REQ-217), 빠른 작업(REQ-218)을 맡길 서비스 주소 (클러스터 안). 비어 있으면 그 기능은 쓸 수 없다 */
+    public record Services(String meetingUrl, String minutesUrl, String userUrl, String workspaceUrl) {
     }
 
     @Override
