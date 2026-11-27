@@ -1,5 +1,6 @@
 package com.nineouting.backend.admin.config;
 
+import com.nineouting.backend.admin.access.IpAccessInterceptor;
 import com.nineouting.backend.admin.auth.AuthInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -12,10 +13,12 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AdminProperties properties;
     private final AuthInterceptor authInterceptor;
+    private final IpAccessInterceptor ipAccessInterceptor;
 
-    public WebConfig(AdminProperties properties, AuthInterceptor authInterceptor) {
+    public WebConfig(AdminProperties properties, AuthInterceptor authInterceptor, IpAccessInterceptor ipAccessInterceptor) {
         this.properties = properties;
         this.authInterceptor = authInterceptor;
+        this.ipAccessInterceptor = ipAccessInterceptor;
     }
 
     @Override
@@ -30,6 +33,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 허용 IP 확인이 먼저 (로그인 화면도 막는다)
+        registry.addInterceptor(ipAccessInterceptor).addPathPatterns("/api/admin/**");
         registry.addInterceptor(authInterceptor).addPathPatterns("/api/admin/**");
     }
 }

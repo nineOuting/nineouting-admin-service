@@ -21,6 +21,8 @@ public record AdminProperties(
         List<String> allowedOrigins,
         int maxLoginFailures,
         Duration lockDuration,
+        List<String> allowedIps,
+        String cloudfrontRangesUrl,
         Map<String, Database> databases) {
 
     private static final int MIN_SECRET_BYTES = 32;
@@ -39,6 +41,7 @@ public record AdminProperties(
         allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
         maxLoginFailures = maxLoginFailures <= 0 ? 5 : maxLoginFailures;
         lockDuration = lockDuration == null ? Duration.ofMinutes(15) : lockDuration;
+        allowedIps = allowedIps == null ? List.of() : allowedIps.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
         // 주소가 빈 DB는 뺀다. 순서는 설정 순서 그대로
         Map<String, Database> configured = new LinkedHashMap<>();
         if (databases != null) {
