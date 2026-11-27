@@ -47,4 +47,13 @@ public record Cidr(byte[] network, int prefix) {
             throw new IllegalArgumentException("IP 주소가 아닙니다: " + address, e);
         }
     }
+
+    /** 기록에 남길 글자 (IPv4는 점 표기) */
+    static String format(byte[] address) {
+        try {
+            return InetAddress.getByAddress(address).getHostAddress();
+        } catch (UnknownHostException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
 }

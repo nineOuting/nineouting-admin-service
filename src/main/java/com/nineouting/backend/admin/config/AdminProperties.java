@@ -23,7 +23,9 @@ public record AdminProperties(
         Duration lockDuration,
         List<String> allowedIps,
         String cloudfrontRangesUrl,
-        Map<String, Database> databases) {
+        Map<String, Database> databases,
+        Database auditDatabase,
+        Services services) {
 
     private static final int MIN_SECRET_BYTES = 32;
 
@@ -52,6 +54,10 @@ public record AdminProperties(
             });
         }
         databases = Collections.unmodifiableMap(configured);
+        // 감사 기록 DB가 비어 있으면 로그로만 남긴다 (로컬, 시험)
+        auditDatabase = auditDatabase == null || auditDatabase.url() == null || auditDatabase.url().isBlank()
+                ? null : auditDatabase;
+        services = services == null ? new Services(null, null) : services;
     }
 
     private static void require(String value, String name) {
@@ -67,6 +73,10 @@ public record AdminProperties(
         public String toString() {
             return "Database[url=" + url + ", username=" + username + "]";
         }
+    }
+
+    /** 운영 조치를 맡길 서비스 주소 (클러스터 안). 비어 있으면 그 조치는 쓸 수 없다 */
+    public record Services(String meetingUrl, String minutesUrl) {
     }
 
     @Override
