@@ -33,6 +33,10 @@ nineouting:
     # 로그인 5번 틀리면 15분 잠금
     max-login-failures: 5
     lock-duration: 15m
+    # 허용 IP 대역 (쉼표로). 비어 있으면 모두 받는다 (로컬, 시험)
+    allowed-ips: ${ADMIN_ALLOWED_IPS:}
+    # 클라이언트 IP를 찾을 때 건너뛸 CloudFront 대역 (AWS 공개 목록)
+    cloudfront-ranges-url: ${ADMIN_CLOUDFRONT_RANGES_URL:https://ip-ranges.amazonaws.com/ip-ranges.json}
     # 주소가 비어 있는 DB는 목록에 넣지 않는다
     databases:
       user:

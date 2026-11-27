@@ -83,6 +83,7 @@ class AdminApiTest {
         registry.add("nineouting.admin.password-hash", () -> new BCryptPasswordEncoder().encode(PASSWORD));
         registry.add("nineouting.admin.session-secret", () -> "test-session-secret-0123456789-abcdef");
         registry.add("nineouting.admin.cookie-secure", () -> "false");
+        registry.add("nineouting.admin.cloudfront-ranges-url", () -> "");
         registry.add("nineouting.admin.databases.test.url", POSTGRES::getJdbcUrl);
         registry.add("nineouting.admin.databases.test.username", POSTGRES::getUsername);
         registry.add("nineouting.admin.databases.test.password", POSTGRES::getPassword);
