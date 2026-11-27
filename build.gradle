@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
+}
+
+group = 'com.nineouting.backend'
+version = '0.0.1'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // DB 5개에 직접 붙는다. 자동 설정 DataSource 하나가 아니라 DB마다 연결 풀을 만들어서 spring-jdbc, HikariCP만 쓴다
+    implementation 'org.springframework:spring-jdbc'
+    implementation 'com.zaxxer:HikariCP'
+    // 관리자 비밀번호 BCrypt 확인만 쓴다 (Spring Security 전체는 쓰지 않음)
+    implementation 'org.springframework.security:spring-security-crypto'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// 테스트 커버리지 보고서 (build/reports/jacoco)
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+    }
+}
+
+// 실행용 JAR 하나만 만든다 (CI가 JAR 하나를 기대)
+tasks.named('jar') {
+    enabled = false
+}

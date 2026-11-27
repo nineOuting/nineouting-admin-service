@@ -1,0 +1,57 @@
+server:
+  port: ${SERVER_PORT:8086}
+  # 파드가 내려갈 때 하던 요청은 마치고 끝낸다
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  application:
+    name: admin-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+nineouting:
+  admin:
+    # 관리자 계정. 비밀값으로만 넣는다 (비밀번호는 BCrypt 해시). 비어 있으면 시작하지 않는다
+    username: ${ADMIN_USERNAME:}
+    password-hash: ${ADMIN_PASSWORD_HASH:}
+    # 로그인 쿠키 서명 키 (32자 이상)
+    session-secret: ${ADMIN_SESSION_SECRET:}
+    session-ttl: 8h
+    cookie-secure: ${ADMIN_COOKIE_SECURE:true}
+    # 관리자 화면 주소 (CORS)
+    allowed-origins: ${ADMIN_ALLOWED_ORIGINS:https://dev.nepnep.app}
+    # 로그인 5번 틀리면 15분 잠금
+    max-login-failures: 5
+    lock-duration: 15m
+    # 주소가 비어 있는 DB는 목록에 넣지 않는다
+    databases:
+      user:
+        url: ${DB_USER_URL:}
+        username: ${DB_USER_USERNAME:}
+        password: ${DB_USER_PASSWORD:}
+      workspace:
+        url: ${DB_WORKSPACE_URL:}
+        username: ${DB_WORKSPACE_USERNAME:}
+        password: ${DB_WORKSPACE_PASSWORD:}
+      meeting:
+        url: ${DB_MEETING_URL:}
+        username: ${DB_MEETING_USERNAME:}
+        password: ${DB_MEETING_PASSWORD:}
+      minutes:
+        url: ${DB_MINUTES_URL:}
+        username: ${DB_MINUTES_USERNAME:}
+        password: ${DB_MINUTES_PASSWORD:}
+      notification:
+        url: ${DB_NOTIFICATION_URL:}
+        username: ${DB_NOTIFICATION_USERNAME:}
+        password: ${DB_NOTIFICATION_PASSWORD:}
