@@ -1,5 +1,6 @@
 package com.nineouting.backend.admin.db;
 
+import com.nineouting.backend.admin.audit.AuditLog;
 import com.nineouting.backend.admin.db.DatabaseRegistry.Target;
 import com.nineouting.backend.admin.db.SchemaReader.Column;
 import com.nineouting.backend.admin.db.SchemaReader.Table;
@@ -10,10 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
@@ -24,15 +23,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class RowService {
 
-    private static final Logger audit = LoggerFactory.getLogger("admin.audit");
     private static final int MAX_PAGE_SIZE = 200;
-    /** 기록에 값을 남기지 않을 열 (비밀번호 해시, 토큰 등) */
-    private static final Pattern SECRET_COLUMN = Pattern.compile("password|secret|token", Pattern.CASE_INSENSITIVE);
 
     private final SchemaReader schema;
+    private final AuditLog audit;
 
-    public RowService(SchemaReader schema) {
+    public RowService(SchemaReader schema, AuditLog audit) {
         this.schema = schema;
+        this.audit = audit;
     }
 
     public record Page(List<Map<String, String>> rows, long total, int page, int size) {
@@ -217,19 +215,13 @@ public class RowService {
         return key;
     }
 
-    /** 누가 언제 무엇을 바꿨는지. 비밀번호, 토큰 같은 열은 값을 가린다 */
-    private static void log(String action, Target target, Table table, Map<String, String> key,
-                            Map<String, String> before, Map<String, String> after) {
-        audit.info("admin {} db={} table={} key={} before={} after={}", action, target.name(), table.name(), key,
-                mask(before), mask(after));
-    }
-
-    private static Map<String, String> mask(Map<String, String> row) {
-        if (row == null) {
-            return null;
-        }
-        Map<String, String> masked = new LinkedHashMap<>();
-        row.forEach((k, v) -> masked.put(k, v != null && SECRET_COLUMN.matcher(k).find() ? "***" : v));
-        return masked;
+    /** 누가 언제 무엇을 바꿨는지 (REQ-216). 비밀번호, 토큰 같은 열은 값을 가린다 */
+    private void log(String action, Target target, Table table, Map<String, String> key,
+                     Map<String, String> before, Map<String, String> after) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("key", key);
+        detail.put("before", AuditLog.mask(before));
+        detail.put("after", AuditLog.mask(after));
+        audit.record("row." + action, target.name() + "." + table.name(), true, detail);
     }
 }

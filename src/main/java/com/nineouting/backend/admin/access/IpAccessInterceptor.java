@@ -1,5 +1,6 @@
 package com.nineouting.backend.admin.access;
 
+import com.nineouting.backend.admin.audit.AuditLog;
 import com.nineouting.backend.admin.config.AdminProperties;
 import com.nineouting.backend.admin.error.AdminException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,7 @@ public class IpAccessInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (allowed.isEmpty()) {
+            request.setAttribute(AuditLog.CLIENT_IP_ATTRIBUTE, request.getRemoteAddr());
             return true;
         }
         if (!cloudFront.loaded()) {
@@ -53,6 +55,7 @@ public class IpAccessInterceptor implements HandlerInterceptor {
                     request.getRemoteAddr());
             throw new AdminException(HttpStatus.FORBIDDEN, "IP_NOT_ALLOWED", "허용되지 않은 곳에서 접속했습니다");
         }
+        request.setAttribute(AuditLog.CLIENT_IP_ATTRIBUTE, Cidr.format(client.get()));
         return true;
     }
 

@@ -1,5 +1,6 @@
 package com.nineouting.backend.admin.auth;
 
+import com.nineouting.backend.admin.audit.AuditLog;
 import com.nineouting.backend.admin.config.AdminProperties;
 import com.nineouting.backend.admin.error.AdminException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,11 +34,13 @@ public class SessionController {
     private final AdminProperties properties;
     private final SessionTokens tokens;
     private final LoginGuard guard;
+    private final AuditLog audit;
 
-    public SessionController(AdminProperties properties, SessionTokens tokens, LoginGuard guard) {
+    public SessionController(AdminProperties properties, SessionTokens tokens, LoginGuard guard, AuditLog audit) {
         this.properties = properties;
         this.tokens = tokens;
         this.guard = guard;
+        this.audit = audit;
     }
 
     public record LoginRequest(@NotNull String username, @NotNull String password) {
@@ -47,6 +50,7 @@ public class SessionController {
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
         Instant lockedUntil = guard.lockedUntil().orElse(null);
         if (lockedUntil != null) {
+            audit.record("login", null, false, Map.of("reason", "locked"));
             throw new AdminException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED",
                     "로그인을 여러 번 틀려 잠겼습니다. " + lockedUntil + " 뒤에 다시 시도해 주세요");
         }
@@ -56,11 +60,15 @@ public class SessionController {
         if (!passwordMatches || !usernameMatches) {
             guard.failed();
             log.warn("관리자 로그인 실패 (ip={})", http.getRemoteAddr());
+            // 입력한 아이디는 남기지 않는다 (비밀번호를 잘못 넣었을 수 있다)
+            audit.record("login", null, false, Map.of("reason", "wrong_credentials"));
             throw new AdminException(HttpStatus.UNAUTHORIZED, "LOGIN_FAILED", "아이디 또는 비밀번호가 맞지 않습니다");
         }
         guard.succeeded();
         log.info("관리자 로그인 (ip={})", http.getRemoteAddr());
         String token = tokens.issue(properties.username());
+        http.setAttribute(AuthInterceptor.SESSION_ATTRIBUTE, tokens.verify(token).orElseThrow());
+        audit.record("login", null, true, null);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie(token, properties.sessionTtl()).toString())
                 .body(Map.of("username", properties.username()));
@@ -68,6 +76,7 @@ public class SessionController {
 
     @DeleteMapping
     public ResponseEntity<Void> logout() {
+        audit.record("logout", null, true, null);
         return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO).toString()).build();
     }
 

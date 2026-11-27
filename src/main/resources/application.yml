@@ -59,3 +59,12 @@ nineouting:
         url: ${DB_NOTIFICATION_URL:}
         username: ${DB_NOTIFICATION_USERNAME:}
         password: ${DB_NOTIFICATION_PASSWORD:}
+    # 감사 기록을 남길 관리자 전용 DB (REQ-216). 비어 있으면 로그로만 남긴다
+    audit-database:
+      url: ${DB_ADMIN_URL:}
+      username: ${DB_ADMIN_USERNAME:}
+      password: ${DB_ADMIN_PASSWORD:}
+    # 운영 조치를 맡길 서비스 (REQ-217). 표를 직접 고치지 않고 각 서비스의 내부 기능을 부른다
+    services:
+      meeting-url: ${MEETING_SERVICE_URL:}
+      minutes-url: ${MINUTES_SERVICE_URL:}
