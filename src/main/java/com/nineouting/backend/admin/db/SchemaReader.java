@@ -27,6 +27,10 @@ public class SchemaReader {
             where n.nspname = 'public' and c.relkind in ('r', 'p')
             order by c.relname""";
 
+    private static final String TABLE_NAME = """
+            select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relname = ?""";
+
     private static final String COLUMNS = """
             select a.attname as name, format_type(a.atttypid, a.atttypmod) as type, not a.attnotnull as nullable,
                    pg_get_expr(d.adbin, d.adrelid) as default_value, a.attidentity as identity, a.attgenerated as generated,
@@ -86,7 +90,10 @@ public class SchemaReader {
         return jdbc.query(TABLES, (rs, i) -> new TableSummary(rs.getString("name"), rs.getLong("estimate")));
     }
 
-    public Table table(JdbcTemplate jdbc, String name) {
+    public Table table(JdbcTemplate jdbc, String requested) {
+        // SQL에 넣을 표 이름은 화면이 보낸 글자가 아니라 DB 카탈로그에서 읽은 이름을 쓴다
+        String name = jdbc.queryForList(TABLE_NAME, String.class, requested).stream().findFirst()
+                .orElseThrow(() -> AdminException.notFound("표를 찾을 수 없습니다: " + requested));
         List<String> primaryKey = jdbc.queryForList(PRIMARY_KEY, String.class, name);
         Map<String, List<String>> checked = new HashMap<>();
         jdbc.query(CHECKS, rs -> {
