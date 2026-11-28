@@ -135,11 +135,12 @@ public class BetaMetricsService {
     /**
      * 섹션은 AI가 글을 채운 칸(초안 줄이 있는 제목)만 센다. 처음 작성 완료한 때의 내용은 완료 직전의 마지막 저장 기록이고,
      * 저장 기록이 없으면 초안 그대로다. 줄 모음이 같으면 그대로, 다르면 내용 수정. 칸이 없어졌으면 양식 변경(삭제)으로,
-     * 초안에 없던 칸이 생겼으면 양식 변경(추가)으로 센다. 표 칸은 줄 비교가 맞지 않아 따로 센다.
+     * 초안에 제목조차 없던 칸이 생겼으면 양식 변경(추가)으로 센다. AI가 채울 내용이 없어 비운 칸을 작성자가 채웠으면 따로 센다.
+     * 표 칸은 줄 비교가 맞지 않아 따로 센다.
      */
     private void drafts(JdbcTemplate jdbc, Query q, Counter c) {
         c.declare("D2", "minutesWithDraft", "draftSections", "unchangedSections", "contentChangedSections",
-                "removedSections", "addedSections", "tableSectionsNotCompared");
+                "removedSections", "addedSections", "filledEmptySections", "tableSectionsNotCompared");
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 select m.id, m.workspace_id, m.draft_lines,
                        (select r.snapshot from minutes_revisions r
@@ -153,6 +154,7 @@ public class BetaMetricsService {
             if (q.excludedWorkspaces().contains(ws)) {
                 continue;
             }
+            Set<String> draftTitles = draftTitles((String) row.get("draft_lines"));
             Map<String, DraftSection> draft = draftSections((String) row.get("draft_lines"));
             if (draft.isEmpty()) {
                 continue;
@@ -176,16 +178,29 @@ public class BetaMetricsService {
             }
             if (finalSections != null) {
                 for (Map.Entry<String, String> entry : finalSections.entrySet()) {
-                    String content = entry.getValue() == null ? "" : entry.getValue().strip();
-                    if (!draft.containsKey(entry.getKey()) && !content.isEmpty()) {
-                        c.add(ws, "D2", "addedSections", 1);
+                    if (draft.containsKey(entry.getKey()) || lines(entry.getValue(), Set.of()).isEmpty()) {
+                        continue;
                     }
+                    // 초안에 제목은 있었는데 AI가 비운 칸이면 작성자가 채운 것, 제목도 없으면 새로 넣은 칸
+                    c.add(ws, "D2", draftTitles.contains(entry.getKey()) ? "filledEmptySections" : "addedSections", 1);
                 }
             }
         }
     }
 
     record DraftSection(Set<String> sentences, Set<String> headings, boolean table) {
+    }
+
+    /** 초안 줄에 나온 칸 제목 모두 (AI가 비운 칸 포함) */
+    private Set<String> draftTitles(String draftLines) {
+        Set<String> titles = new HashSet<>();
+        for (JsonNode line : parse(draftLines)) {
+            String title = line.path("title").asString("");
+            if (!title.isEmpty()) {
+                titles.add(title);
+            }
+        }
+        return titles;
     }
 
     private Map<String, DraftSection> draftSections(String draftLines) {
