@@ -11,6 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.springframework.jdbc.core.RowMapper;
@@ -24,6 +26,11 @@ import org.springframework.stereotype.Service;
 public class RowService {
 
     private static final int MAX_PAGE_SIZE = 200;
+    /** 값 추천: 서로 다른 값이 이만큼 이하인 열만 (상태, 종류 같은 열) */
+    static final int MAX_SUGGESTIONS = 20;
+    /** 값 추천을 볼 글자 열의 최대 길이 (긴 글, 이메일 같은 열은 뺀다) */
+    private static final int MAX_SUGGESTION_LENGTH = 64;
+    private static final Pattern SHORT_VARCHAR = Pattern.compile("character varying\\((\\d+)\\)");
 
     private final SchemaReader schema;
     private final AuditLog audit;
@@ -63,6 +70,32 @@ public class RowService {
         List<Map<String, String>> rows = target.jdbc().query("select " + selectList(table) + " from " + quote(table.name())
                 + where + order + " limit ? offset ?", mapper(table), pageArgs.toArray());
         return new Page(rows, total, pageNumber, pageSize);
+    }
+
+    /**
+     * REQ-219 값 추천. 서비스 DB의 상태, 종류 열은 CHECK 제약 없이 글자로 저장돼 있어 허용 값 목록이 없다.
+     * 그래서 짧은 글자 열에 이미 들어 있는 값을 (서로 다른 값이 20개 이하일 때만) 추천으로 준다. 다른 값을 막지는 않는다.
+     * 기본 키, _id 열, 허용 값 목록이 있는 열, 비밀번호와 토큰 같은 열은 뺀다
+     */
+    public Map<String, List<String>> suggestions(Target target, String tableName) {
+        Table table = schema.table(target.jdbc(), tableName);
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        for (Column column : table.columns()) {
+            Matcher varchar = SHORT_VARCHAR.matcher(column.type());
+            // 번호, 요청 ID 같은 _id 열은 값이 매번 달라 추천하지 않는다
+            if (column.primaryKey() || !column.allowedValues().isEmpty() || AuditLog.isSecretColumn(column.name())
+                    || column.name().endsWith("_id")
+                    || !varchar.matches() || Integer.parseInt(varchar.group(1)) > MAX_SUGGESTION_LENGTH) {
+                continue;
+            }
+            List<String> values = target.jdbc().queryForList("select distinct " + quote(column.name()) + "::text from "
+                    + quote(table.name()) + " where " + quote(column.name()) + " is not null order by 1 limit ?",
+                    String.class, MAX_SUGGESTIONS + 1);
+            if (!values.isEmpty() && values.size() <= MAX_SUGGESTIONS) {
+                result.put(column.name(), values);
+            }
+        }
+        return result;
     }
 
     public Map<String, String> insert(Target target, String tableName, Map<String, String> values) {

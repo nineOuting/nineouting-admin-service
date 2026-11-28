@@ -108,6 +108,22 @@ class DashboardAuditOperationsTest {
         CALLS.add(exchange.getRequestMethod() + " " + path);
         if (path.equals("/internal/admin/meetings/10/finish") || path.equals("/internal/admin/minutes/30/draft-retry")) {
             exchange.sendResponseHeaders(204, -1);
+        } else if (path.equals("/internal/admin/users")) {
+            String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            CALLS.add(request);
+            if (request.contains("taken@example.com")) {
+                respond(exchange, 409, "{\"success\":false,\"data\":null,\"message\":\"이미 가입된 이메일이에요.\",\"code\":\"EMAIL_ALREADY_EXISTS\"}");
+            } else if (request.contains("\"password\":\"short\"")) {
+                respond(exchange, 400, "{\"success\":false,\"data\":[{\"field\":\"password\",\"reason\":\"비밀번호 규칙\"}],"
+                        + "\"message\":\"입력값을 확인해 주세요\",\"code\":\"INVALID_INPUT\"}");
+            } else {
+                respond(exchange, 201, "{\"success\":true,\"data\":{\"userId\":77},\"message\":null,\"code\":null}");
+            }
+        } else if (path.equals("/internal/admin/workspaces/1/members")) {
+            String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            CALLS.add(request);
+            boolean added = !request.contains("\"userId\":2");
+            respond(exchange, 200, "{\"success\":true,\"data\":{\"workspaceId\":1,\"userId\":0,\"added\":" + added + "}}");
         } else {
             byte[] body = "{\"success\":false,\"data\":null,\"message\":\"진행 중인 회의가 아닙니다\",\"code\":\"MEETING_NOT_IN_PROGRESS\"}"
                     .getBytes(StandardCharsets.UTF_8);
@@ -132,6 +148,8 @@ class DashboardAuditOperationsTest {
         String services = "http://127.0.0.1:" + SERVICES.getAddress().getPort();
         registry.add("nineouting.admin.services.meeting-url", () -> services);
         registry.add("nineouting.admin.services.minutes-url", () -> services);
+        registry.add("nineouting.admin.services.user-url", () -> services);
+        registry.add("nineouting.admin.services.workspace-url", () -> services);
     }
 
     private static void database(DynamicPropertyRegistry registry, String prefix) {
@@ -167,6 +185,58 @@ class DashboardAuditOperationsTest {
                 .andExpect(jsonPath("$.failures[?(@.kind == 'materialRag')].id", contains(20)))
                 .andExpect(jsonPath("$.failures[?(@.kind == 'mail')].error", contains("smtp down")))
                 .andExpect(jsonPath("$.unavailable").isEmpty());
+    }
+
+    private static void respond(HttpExchange exchange, int status, String json) throws IOException {
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, body.length);
+        exchange.getResponseBody().write(body);
+    }
+
+    @Test
+    void 빠른_작업은_서비스_내부_기능으로_계정을_만들고_멤버로_넣는다() throws Exception {
+        // REQ-218
+        Cookie cookie = loggedIn();
+        mockMvc.perform(write(post("/api/admin/actions/users")).cookie(cookie)
+                        .content("{\"email\":\"new@example.com\",\"password\":\"password123\",\"name\":\"새 계정\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(77));
+        mockMvc.perform(write(post("/api/admin/actions/users")).cookie(cookie)
+                        .content("{\"email\":\"taken@example.com\",\"password\":\"password123\",\"name\":\"x\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"));
+        // 입력 검사 오류는 칸별 문구를 보여 준다
+        mockMvc.perform(write(post("/api/admin/actions/users")).cookie(cookie)
+                        .content("{\"email\":\"n2@example.com\",\"password\":\"short\",\"name\":\"x\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("비밀번호 규칙"));
+
+        // 사용자는 이메일(대소문자 무시)이나 번호로 고른다
+        mockMvc.perform(write(post("/api/admin/actions/workspace-members")).cookie(cookie)
+                        .content("{\"workspaceId\":1,\"user\":\"A@example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.added").value(true));
+        mockMvc.perform(write(post("/api/admin/actions/workspace-members")).cookie(cookie)
+                        .content("{\"workspaceId\":1,\"user\":\"2\"}"))
+                .andExpect(jsonPath("$.added").value(false));
+        mockMvc.perform(write(post("/api/admin/actions/workspace-members")).cookie(cookie)
+                        .content("{\"workspaceId\":1,\"user\":\"nobody@example.com\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+        assertThat(CALLS).contains("{\"userId\":1}");
+
+        // 비밀번호는 기록에 남기지 않는다
+        mockMvc.perform(get("/api/admin/audit?action=user.create").cookie(cookie))
+                .andExpect(jsonPath("$.entries[2].target").value("user#77"))
+                .andExpect(jsonPath("$.entries[2].detail", containsString("new@example.com")))
+                .andExpect(jsonPath("$.entries[2].detail", org.hamcrest.Matchers.not(containsString("password123"))))
+                .andExpect(jsonPath("$.entries[0].succeeded").value(false));
+        mockMvc.perform(get("/api/admin/audit?action=workspace.addMember").cookie(cookie))
+                .andExpect(jsonPath("$.entries[0].target").value("workspace#1"))
+                .andExpect(jsonPath("$.entries[0].succeeded").value(false))
+                .andExpect(jsonPath("$.entries[2].succeeded").value(true));
     }
 
     @Test

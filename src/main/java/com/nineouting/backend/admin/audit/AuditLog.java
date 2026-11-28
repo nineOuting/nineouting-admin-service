@@ -102,7 +102,7 @@ public class AuditLog implements DisposableBean {
             return null;
         }
         Map<String, String> masked = new LinkedHashMap<>();
-        row.forEach((k, v) -> masked.put(k, v != null && SECRET_COLUMN.matcher(k).find() ? "***" : v));
+        row.forEach((k, v) -> masked.put(k, v != null && isSecretColumn(k) ? "***" : v));
         return masked;
     }
 
@@ -164,5 +164,10 @@ public class AuditLog implements DisposableBean {
         if (dataSource != null) {
             dataSource.close();
         }
+    }
+
+    /** 비밀번호, 토큰 같은 값을 담는 열 (기록에서 가리고, 값 추천에서 뺀다) */
+    public static boolean isSecretColumn(String column) {
+        return SECRET_COLUMN.matcher(column).find();
     }
 }
