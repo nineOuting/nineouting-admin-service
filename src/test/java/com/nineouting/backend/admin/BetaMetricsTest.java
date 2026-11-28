@@ -81,12 +81,12 @@ class BetaMetricsTest {
                   ('SUCCEEDED', 3, '2026-12-01'), ('FAILED', null, '2026-12-01'), ('SUCCEEDED', 99, '2026-12-02');
                 insert into minutes values
                   (10, 100, '2026-12-02 10:00', '2026-12-02 12:00',
-                   '[{"title":"안건","type":"text","sentence":"가"},{"title":"안건","type":"text","sentence":"나"},{"title":"할 일","type":"text","sentence":"다"}]', 2),
+                   '[{"title":"안건","type":"text","sentence":"가"},{"title":"안건","type":"text","sentence":"나"},{"title":"할 일","type":"text","sentence":"다"},{"title":"메모","type":"text","sentence":"해당 내용 없음"}]', 2),
                   (11, 100, '2026-12-03 10:00', '2026-12-03 12:00', '[{"title":"A","type":"text","sentence":"x"}]', 3),
                   (12, 100, '2026-12-03 10:00', null, null, 3),
                   (13, 200, '2026-12-03 10:00', '2026-12-03 12:00', '[{"title":"A","type":"text","sentence":"x"}]', 3);
                 insert into minutes_revisions (minutes_id, version, edited_at, snapshot, after_confirm) values
-                  (10, 1, '2026-12-02 11:00', '[{"title":"안건","content":"- 가\\n- 나"},{"title":"할 일","content":"- 다 고침"}]', false),
+                  (10, 1, '2026-12-02 11:00', '[{"title":"안건","content":"- 가\\n- 나"},{"title":"할 일","content":"- 다 고침"},{"title":"메모","content":"- 작성자가 씀"},{"title":"새 칸","content":"- 추가"}]', false),
                   (10, 2, '2026-12-02 13:00', '[{"title":"안건","content":"- 가"},{"title":"할 일","content":"- 다"}]', true);
                 """);
     }
@@ -121,6 +121,9 @@ class BetaMetricsTest {
                 .andExpect(jsonPath("$.total.D2.unchangedSections").value(2))
                 .andExpect(jsonPath("$.total.D2.contentChangedSections").value(1))
                 .andExpect(jsonPath("$.total.D2.removedSections").value(0))
+                // AI가 비운 칸(해당 내용 없음)을 채운 것과, 초안에 없던 칸을 넣은 것을 나눈다
+                .andExpect(jsonPath("$.total.D2.filledEmptySections").value(1))
+                .andExpect(jsonPath("$.total.D2.addedSections").value(1))
                 // D3, D5, D6: 회의가 끝난 뒤의 오늘 회의 요약. u- 번호는 사람이 넣은 항목
                 .andExpect(jsonPath("$.total.D3.summarySentences").value(2))
                 .andExpect(jsonPath("$.total.D3.editedSummarySentences").value(1))
